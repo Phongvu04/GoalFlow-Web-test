@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GoalFlow - Quản Lý Mục Tiêu Cá Nhân</title>
+    <link rel="stylesheet" href="styles.css">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Crimson+Pro:wght@300;400;600&display=swap"
+        rel="stylesheet">
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- Welcome Screen -->
+        <div id="welcome-screen" class="screen active">
+            <div class="welcome-content">
+                <div class="logo-container">
+                    <svg class="logo-icon" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <circle cx="50" cy="50" r="35" stroke="currentColor" stroke-width="3" />
+                        <path d="M35 50L45 60L65 40" stroke="currentColor" stroke-width="4" stroke-linecap="round"
+                            stroke-linejoin="round" />
+                    </svg>
+                    <h1 class="logo-text">GoalFlow</h1>
+                </div>
+                <p class="tagline">Biến giấc mơ thành hành động</p>
+
+                <form id="user-info-form" class="user-form">
+                    <div class="form-group">
+                        <label for="user-name">Tên của bạn</label>
+                        <input type="text" id="user-name" name="name" required placeholder="Nguyễn Văn A">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="user-email">Email</label>
+                        <input type="email" id="user-email" name="email" pattern=".+@gmail\.com"
+                            title="Vui lòng nhập đúng địa chỉ @gmail.com" required placeholder="example@gmail.com">
+                    </div>
+
+                    <button type="submit" class="btn btn-primary">
+                        <span>Bắt đầu hành trình</span>
+                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                            <path d="M4 10h12M12 6l4 4-4 4" stroke="currentColor" stroke-width="2"
+                                stroke-linecap="round" />
+                        </svg>
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Goal Choice Screen -->
+        <div id="choice-screen" class="screen">
+            <div class="header">
+                <div class="logo-small">
+                    <svg viewBox="0 0 100 100" fill="none">
+                        <circle cx="50" cy="50" r="35" stroke="currentColor" stroke-width="3" />
+                        <path d="M35 50L45 60L65 40" stroke="currentColor" stroke-width="4" stroke-linecap="round" />
+                    </svg>
+                    <span>GoalFlow</span>
+                </div>
+                <div class="user-info-display">
+                    <span id="display-user-name"></span>
+                    <button id="logout-btn" class="btn-icon">
+                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                            <path d="M13 14l4-4-4-4M17 10H7M10 2H5a2 2 0 00-2 2v12a2 2 0 002 2h5" stroke="currentColor"
+                                stroke-width="2" stroke-linecap="round" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            <div class="choice-content">
+                <h2 class="section-title">Bạn đã có mục tiêu chưa?</h2>
+                <p class="section-subtitle">Chọn một trong hai tùy chọn để bắt đầu</p>
+
+                <div class="choice-cards">
+                    <div class="choice-card" id="has-goals-card">
+                        <div class="card-icon">
+                            <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+                                <rect x="8" y="8" width="32" height="32" rx="4" stroke="currentColor"
+                                    stroke-width="3" />
+                                <path d="M16 24l6 6 10-12" stroke="currentColor" stroke-width="3"
+                                    stroke-linecap="round" />
+                            </svg>
+                        </div>
+                        <h3>Đã có mục tiêu</h3>
+                        <p>Bạn đã biết mình muốn gì và cần công cụ để quản lý</p>
+                        <button class="btn btn-outline" data-choice="has-goals">
+                            <span>Tự quản lý</span>
+                            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                                <path d="M4 10h12M12 6l4 4-4 4" stroke="currentColor" stroke-width="2"
+                                    stroke-linecap="round" />
+                            </svg>
+                        </button>
+                    </div>
+
+                    <div class="choice-card" id="no-goals-card">
+                        <div class="card-icon">
+                            <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+                                <circle cx="24" cy="24" r="18" stroke="currentColor" stroke-width="3" />
+                                <path d="M24 16v8M24 28v.5" stroke="currentColor" stroke-width="3"
+                                    stroke-linecap="round" />
+                            </svg>
+                        </div>
+                        <h3>Chưa có mục tiêu</h3>
+                        <p>Để AI tư vấn và giúp bạn xây dựng mục tiêu phù hợp</p>
+                        <button class="btn btn-outline" data-choice="no-goals">
+                            <span>Được tư vấn</span>
+                            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                                <path d="M4 10h12M12 6l4 4-4 4" stroke="currentColor" stroke-width="2"
+                                    stroke-linecap="round" />
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- AI Consultation Screen -->
+        <div id="consultation-screen" class="screen">
+            <div class="header">
+                <button id="back-to-choice-btn" class="btn-icon">
+                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                        <path d="M16 10H4M8 14l-4-4 4-4" stroke="currentColor" stroke-width="2"
+                            stroke-linecap="round" />
+                    </svg>
+                </button>
+                <div class="logo-small">
+                    <svg viewBox="0 0 100 100" fill="none">
+                        <circle cx="50" cy="50" r="35" stroke="currentColor" stroke-width="3" />
+                        <path d="M35 50L45 60L65 40" stroke="currentColor" stroke-width="4" stroke-linecap="round" />
+                    </svg>
+                    <span>AI Tư Vấn</span>
+                </div>
+                <div></div>
+            </div>
+
+            <div class="consultation-content">
+                <div id="chat-container" class="chat-container">
+                    <div class="chat-message ai-message">
+                        <div class="message-avatar">AI</div>
+                        <div class="message-content">
+                            <p>Xin chào! Tôi là trợ lý AI của GoalFlow. Tôi sẽ giúp bạn xác định và xây dựng các mục
+                                tiêu phù hợp.</p>
+                            <p>Để bắt đầu, hãy cho tôi biết: <strong>Bạn muốn đạt được điều gì trong cuộc sống?</strong>
+                                (Có thể là sự nghiệp, sức khỏe, tài chính, học tập, hoặc bất kỳ lĩnh vực nào bạn quan
+                                tâm)</p>
+                        </div>
+                    </div>
+                </div>
+
+                <form id="chat-form" class="chat-input-form">
+                    <input type="text" id="chat-input" placeholder="Nhập câu trả lời của bạn..." required>
+                    <button type="submit" class="btn-send">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                            <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" stroke="currentColor" stroke-width="2"
+                                stroke-linecap="round" stroke-linejoin="round" />
+                        </svg>
+                    </button>
+                </form>
+
+                <div id="generate-goals-container" style="display: none; margin-top: 20px;">
+                    <div class="timeframe-input-container" style="margin-bottom: 16px;">
+                        <label for="timeframe-value"
+                            style="display: block; font-size: 0.875rem; font-weight: 600; margin-bottom: 8px;">Bạn muốn
+                            hoàn thành các mục tiêu này trong bao lâu?</label>
+                        <div style="display: flex; gap: 12px;">
+                            <input type="number" id="timeframe-value" min="1" value="3"
+                                style="width: 80px; padding: 10px; border: 2px solid var(--border-color); border-radius: var(--radius-sm);">
+                            <select id="timeframe-unit"
+                                style="flex: 1; padding: 10px; border: 2px solid var(--border-color); border-radius: var(--radius-sm);">
+                                <option value="tuần">Tuần</option>
+                                <option value="tháng" selected>Tháng</option>
+                                <option value="năm">Năm</option>
+                            </select>
+                        </div>
+                    </div>
+                    <button id="generate-goals-btn" class="btn btn-primary" style="width: 100%;">
+                        <span>Tạo mục tiêu từ cuộc trò chuyện</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Goals Management Screen -->
+        <div id="goals-screen" class="screen">
+            <div class="header">
+                <div class="logo-small">
+                    <svg viewBox="0 0 100 100" fill="none">
+                        <circle cx="50" cy="50" r="35" stroke="currentColor" stroke-width="3" />
+                        <path d="M35 50L45 60L65 40" stroke="currentColor" stroke-width="4" stroke-linecap="round" />
+                    </svg>
+                    <span>GoalFlow</span>
+                </div>
+                <div class="header-actions">
+                    <button id="profile-btn" class="btn-icon">
+                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                            <circle cx="10" cy="7" r="3" stroke="currentColor" stroke-width="2" />
+                            <path d="M4 17c0-3 2.5-5 6-5s6 2 6 5" stroke="currentColor" stroke-width="2"
+                                stroke-linecap="round" />
+                        </svg>
+                    </button>
+                    <button id="logout-goals-btn" class="btn-icon">
+                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                            <path d="M13 14l4-4-4-4M17 10H7M10 2H5a2 2 0 00-2 2v12a2 2 0 002 2h5" stroke="currentColor"
+                                stroke-width="2" stroke-linecap="round" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            <div class="goals-content">
+                <div class="goals-header">
+                    <h2 class="section-title">Mục tiêu của bạn</h2>
+                    <button id="add-goal-btn" class="btn btn-primary">
+                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                            <path d="M10 4v12M4 10h12" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                        </svg>
+                        <span>Thêm mục tiêu</span>
+                    </button>
+                </div>
+
+                <div class="tabs">
+                    <button class="tab active" data-tab="all">Tất cả</button>
+                    <button class="tab" data-tab="weekly">Tuần</button>
+                    <button class="tab" data-tab="monthly">Tháng</button>
+                    <button class="tab" data-tab="yearly">Năm</button>
+                    <button class="tab" data-tab="long-term">Dài hạn</button>
+                </div>
+
+                <div id="goals-list" class="goals-list">
+                    <div class="empty-state">
+                        <svg width="80" height="80" viewBox="0 0 80 80" fill="none">
+                            <circle cx="40" cy="40" r="30" stroke="currentColor" stroke-width="3" opacity="0.3" />
+                            <path d="M40 30v20M30 40h20" stroke="currentColor" stroke-width="3" stroke-linecap="round"
+                                opacity="0.3" />
+                        </svg>
+                        <p>Chưa có mục tiêu nào</p>
+                        <p class="empty-subtitle">Nhấn "Thêm mục tiêu" để bắt đầu</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Profile Screen -->
+        <div id="profile-screen" class="screen">
+            <div class="header">
+                <button id="back-to-goals-btn" class="btn-icon">
+                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                        <path d="M16 10H4M8 14l-4-4 4-4" stroke="currentColor" stroke-width="2"
+                            stroke-linecap="round" />
+                    </svg>
+                </button>
+                <div class="logo-small">
+                    <svg viewBox="0 0 100 100" fill="none">
+                        <circle cx="50" cy="50" r="35" stroke="currentColor" stroke-width="3" />
+                        <path d="M35 50L45 60L65 40" stroke="currentColor" stroke-width="4" stroke-linecap="round" />
+                    </svg>
+                    <span>Hồ sơ cá nhân</span>
+                </div>
+                <div></div>
+            </div>
+
+            <div class="profile-content">
+                <div class="profile-card">
+                    <div class="profile-avatar">
+                        <svg width="60" height="60" viewBox="0 0 60 60" fill="none">
+                            <circle cx="30" cy="30" r="28" fill="var(--accent-color)" opacity="0.1" />
+                            <circle cx="30" cy="23" r="8" stroke="currentColor" stroke-width="2" />
+                            <path d="M14 47c0-6 5-10 16-10s16 4 16 10" stroke="currentColor" stroke-width="2"
+                                stroke-linecap="round" />
+                        </svg>
+                    </div>
+                    <h3 id="profile-name">Người dùng</h3>
+                    <p id="profile-email">email@example.com</p>
+                </div>
+
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-value" id="total-goals">0</div>
+                        <div class="stat-label">Tổng mục tiêu</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="completed-goals">0</div>
+                        <div class="stat-label">Đã hoàn thành</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="in-progress-goals">0</div>
+                        <div class="stat-label">Đang thực hiện</div>
+                    </div>
+                </div>
+
+                <div class="priority-chart-container"
+                    style="margin-top: 32px; background: white; padding: 24px; border-radius: var(--radius-md); box-shadow: var(--shadow-sm); border: 1px solid var(--border-color); margin-bottom: 32px;">
+                    <h4
+                        style="font-family: var(--font-display); font-size: 1.125rem; margin-bottom: 16px; text-align: center;">
+                        Mức độ ưu tiên</h4>
+                    <div
+                        style="display: flex; justify-content: center; align-items: center; gap: 24px; flex-wrap: wrap;">
+                        <div style="position: relative; width: 160px; height: 160px;">
+                            <canvas id="priority-chart" width="160" height="160"></canvas>
+                        </div>
+                        <div id="priority-legend" style="display: flex; flex-direction: column; gap: 12px;">
+                            <!-- Legend items injected via JS -->
+                        </div>
+                    </div>
+                </div>
+
+                <div class="profile-actions">
+                    <button id="export-data-btn" class="btn btn-outline">
+                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                            <path d="M6 10l4 4 4-4M10 14V2M2 18h16" stroke="currentColor" stroke-width="2"
+                                stroke-linecap="round" />
+                        </svg>
+                        <span>Xuất dữ liệu</span>
+                    </button>
+                    <button id="delete-account-btn" class="btn btn-danger">
+                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                            <path d="M3 6h14M8 6V4a2 2 0 012-2h0a2 2 0 012 2v2M5 6v10a2 2 0 002 2h6a2 2 0 002-2V6"
+                                stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                        </svg>
+                        <span>Xóa tài khoản</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for Adding/Editing Goals -->
+    <div id="goal-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modal-title">Thêm mục tiêu mới</h3>
+                <button class="close-modal">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                        <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                    </svg>
+                </button>
+            </div>
+            <form id="goal-form">
+                <div class="form-group">
+                    <label for="goal-title">Tiêu đề mục tiêu</label>
+                    <input type="text" id="goal-title" required placeholder="VD: Học tiếng Anh">
+                </div>
+
+                <div class="form-group">
+                    <label for="goal-description">Mô tả chi tiết</label>
+                    <textarea id="goal-description" rows="3"
+                        placeholder="Mô tả chi tiết về mục tiêu của bạn..."></textarea>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="goal-category">Loại mục tiêu</label>
+                        <select id="goal-category" required>
+                            <option value="weekly">Tuần</option>
+                            <option value="monthly">Tháng</option>
+                            <option value="yearly">Năm</option>
+                            <option value="long-term">Dài hạn</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="goal-deadline">Hạn hoàn thành</label>
+                        <input type="date" id="goal-deadline" required>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="goal-priority">Độ ưu tiên</label>
+                    <select id="goal-priority" required>
+                        <option value="high">Cao</option>
+                        <option value="medium">Trung bình</option>
+                        <option value="low">Thấp</option>
+                    </select>
+                </div>
+
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-outline cancel-modal">Hủy</button>
+                    <button type="submit" class="btn btn-primary">
+                        <span id="submit-text">Thêm mục tiêu</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+
+</html>
