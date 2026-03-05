@@ -42,6 +42,19 @@ function checkExistingUser() {
 function attachEventListeners() {
     // Welcome Screen
     document.getElementById('user-info-form').addEventListener('submit', handleUserSubmit);
+    const welcomeLogo = document.getElementById('main-logo-welcome');
+    if (welcomeLogo) {
+        welcomeLogo.addEventListener('click', () => {
+            if (AppState.user) showScreen('choice');
+        });
+    }
+
+    // Logo Navigation
+    document.querySelectorAll('.nav-logo').forEach(logo => {
+        logo.addEventListener('click', () => {
+            if (AppState.user) showScreen('choice');
+        });
+    });
 
     // Choice Screen
     document.querySelectorAll('[data-choice]').forEach(btn => {
@@ -60,6 +73,9 @@ function attachEventListeners() {
 
     // Goals Screen
     document.getElementById('add-goal-btn').addEventListener('click', () => openGoalModal());
+    const aiSupportBtn = document.getElementById('ai-support-btn');
+    if (aiSupportBtn) aiSupportBtn.addEventListener('click', openAISupportModal);
+
     document.getElementById('profile-btn').addEventListener('click', () => showScreen('profile'));
     document.getElementById('logout-goals-btn').addEventListener('click', handleLogout);
 
@@ -81,9 +97,19 @@ function attachEventListeners() {
         btn.addEventListener('click', closeGoalModal);
     });
 
+    document.querySelectorAll('.close-ai-modal, .cancel-modal-ai').forEach(btn => {
+        btn.addEventListener('click', closeAISupportModal);
+    });
+
     document.getElementById('goal-modal').addEventListener('click', (e) => {
         if (e.target.id === 'goal-modal') {
             closeGoalModal();
+        }
+    });
+
+    document.getElementById('ai-support-modal').addEventListener('click', (e) => {
+        if (e.target.id === 'ai-support-modal') {
+            closeAISupportModal();
         }
     });
 
@@ -534,6 +560,8 @@ function createGoalCard(goal) {
     const today = new Date();
     const daysLeft = Math.ceil((deadline - today) / (1000 * 60 * 60 * 24));
 
+    const isCompleted = goal.status === 'completed';
+
     return `
         <div class="goal-item" data-goal-id="${goal.id}">
             <div class="goal-header-row">
@@ -546,6 +574,9 @@ function createGoalCard(goal) {
                 </div>
             </div>
             
+            ${isCompleted ? `
+            <div class="goal-completed-text">Mục tiêu đã hoàn thành</div>
+            ` : `
             <div class="countdown-timer" data-deadline="${goal.deadline}">
                 <div class="timer-box">
                     <span class="time-val days">00</span>
@@ -567,15 +598,18 @@ function createGoalCard(goal) {
                     <span class="time-label">Giây</span>
                 </div>
             </div>
+            `}
             
             ${goal.description ? `<p class="goal-description">${goal.description}</p>` : ''}
             <div class="goal-actions">
+                ${!isCompleted ? `
                 <button class="btn btn-outline btn-complete" data-goal-id="${goal.id}">
                     <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                         <path d="M3 8l4 4 6-8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
                     </svg>
                     <span>Hoàn thành</span>
                 </button>
+                ` : ''}
                 <button class="btn btn-outline btn-edit" data-goal-id="${goal.id}">
                     <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                         <path d="M11 2l3 3-8 8H3v-3l8-8z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
@@ -721,6 +755,71 @@ async function handleGoalSubmit(e) {
     saveGoals();
     renderGoals();
     closeGoalModal();
+}
+
+// AI Support Modal Logic
+function openAISupportModal() {
+    const modal = document.getElementById('ai-support-modal');
+    const goalsList = document.getElementById('ai-support-goals-list');
+
+    const activeGoals = AppState.goals.filter(g => g.status !== 'completed');
+
+    if (activeGoals.length === 0) {
+        goalsList.innerHTML = '<p style="text-align:center; color: var(--text-secondary); padding: 20px;">Bạn chưa có mục tiêu nào đang thực hiện để AI hỗ trợ.</p>';
+    } else {
+        goalsList.innerHTML = activeGoals.map(goal => `
+            <div class="ai-support-goal-item" data-goal-id="${goal.id}">
+                <h4>${goal.title}</h4>
+                ${goal.description ? `<p>${goal.description.substring(0, 50)}${goal.description.length > 50 ? '...' : ''}</p>` : ''}
+            </div>
+        `).join('');
+
+        goalsList.querySelectorAll('.ai-support-goal-item').forEach(item => {
+            item.addEventListener('click', (e) => {
+                const goalId = e.currentTarget.dataset.goalId;
+                startAISupportForGoal(goalId);
+            });
+        });
+    }
+
+    modal.classList.add('active');
+}
+
+function closeAISupportModal() {
+    document.getElementById('ai-support-modal').classList.remove('active');
+}
+
+function startAISupportForGoal(goalId) {
+    closeAISupportModal();
+    const goal = AppState.goals.find(g => g.id === goalId);
+    if (!goal) return;
+
+    // Setup consultation screen for specific goal support
+    const chatContainer = document.getElementById('chat-container');
+    chatContainer.innerHTML = `
+        <div class="chat-message ai-message">
+            <div class="message-avatar">AI</div>
+            <div class="message-content">
+                <p>Tôi thấy bạn đang cần hỗ trợ cho mục tiêu: <strong>"${goal.title}"</strong>.</p>
+                ${goal.description ? `<p>Mô tả của bạn: "${goal.description}"</p>` : ''}
+                <p>Bạn đang gặp khó khăn gì, hoặc bạn muốn tôi lập kế hoạch chi tiết như thế nào cho mục tiêu này?</p>
+            </div>
+        </div>
+    `;
+
+    // Initialize chat history with context
+    AppState.chatHistory = [
+        {
+            role: 'assistant',
+            content: `Tôi sẽ hỗ trợ bạn với mục tiêu: "${goal.title}". Bạn gặp vấn đề gì?`
+        }
+    ];
+
+    // Hide the generate goals button container because we are supporting an existing goal
+    const container = document.getElementById('generate-goals-container');
+    if (container) container.style.display = 'none';
+
+    showScreen('consultation');
 }
 
 function completeGoal(goalId) {
@@ -873,23 +972,55 @@ function drawPriorityChart() {
 }
 
 function exportUserData() {
-    const data = {
-        user: AppState.user,
-        goals: AppState.goals,
-        exportedAt: new Date().toISOString()
-    };
+    if (!AppState.goals || AppState.goals.length === 0) {
+        showToast('Không có dữ liệu mục tiêu để xuất', 'info');
+        return;
+    }
 
-    const dataStr = JSON.stringify(data, null, 2);
-    const dataBlob = new Blob([dataStr], { type: 'application/json' });
+    // Prepare data for Excel
+    const excelData = AppState.goals.map(goal => ({
+        "Tiêu đề": goal.title,
+        "Mô tả": goal.description || '',
+        "Danh mục": goal.category === 'weekly' ? 'Tuần' : goal.category === 'monthly' ? 'Tháng' : goal.category === 'yearly' ? 'Năm' : 'Dài hạn',
+        "Độ ưu tiên": goal.priority === 'high' ? 'Cao' : goal.priority === 'medium' ? 'Trung bình' : 'Thấp',
+        "Hạn hoàn thành": goal.deadline,
+        "Trạng thái": goal.status === 'completed' ? 'Đã hoàn thành' : 'Đang thực hiện',
+        "Ngày tạo": new Date(goal.createdAt).toLocaleDateString('vi-VN'),
+        "Ngày hoàn thành": goal.completedAt ? new Date(goal.completedAt).toLocaleDateString('vi-VN') : ''
+    }));
 
-    const url = URL.createObjectURL(dataBlob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `goalflow-data-${Date.now()}.json`;
-    link.click();
+    try {
+        // Create a new workbook
+        const wb = XLSX.utils.book_new();
 
-    URL.revokeObjectURL(url);
-    showToast('Đã xuất dữ liệu thành công', 'success');
+        // Convert JSON to worksheet
+        const ws = XLSX.utils.json_to_sheet(excelData);
+
+        // Auto-size columns (basic implementation)
+        const colWidths = [
+            { wch: 30 }, // Tiêu đề
+            { wch: 40 }, // Mô tả
+            { wch: 15 }, // Danh mục
+            { wch: 15 }, // Độ ưu tiên
+            { wch: 15 }, // Hạn hoàn thành
+            { wch: 20 }, // Trạng thái
+            { wch: 15 }, // Ngày tạo
+            { wch: 15 }  // Ngày hoàn thành
+        ];
+        ws['!cols'] = colWidths;
+
+        // Add worksheet to workbook
+        XLSX.utils.book_append_sheet(wb, ws, "Mục Tiêu");
+
+        // Use SheetJS to write and download file
+        const fileName = `GoalFlow_Data_${new Date().toISOString().split('T')[0]}.xlsx`;
+        XLSX.writeFile(wb, fileName);
+
+        showToast('Đã xuất dữ liệu Excel thành công', 'success');
+    } catch (error) {
+        console.error('Lỗi khi xuất định dạng Excel:', error);
+        showToast('Có lỗi xảy ra khi xuất dữ liệu', 'error');
+    }
 }
 
 // Toast Notifications

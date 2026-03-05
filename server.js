@@ -228,6 +228,43 @@ app.post('/api/ai/generate-goals', async (req, res) => {
 });
 
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
+
+// --- EMAIL NOTIFICATIONS ROUTE ---
+app.post('/api/notifications/completion', async (req, res) => {
+    try {
+        const { userId, email, goalTitle } = req.body;
+
+        if (!email) {
+            return res.status(400).json({ success: false, error: 'Thiếu email để gửi thông báo' });
+        }
+
+        const mailOptions = {
+            from: `"GoalFlow Team" <${process.env.EMAIL_USER}>`,
+            to: email,
+            subject: '🎉 Chúc mừng bạn đã hoàn thành mục tiêu!',
+            text: `Chào bạn,
+
+Thật tuyệt vời! Chúng tôi nhận thấy bạn vừa hoàn thành mục tiêu: "${goalTitle}".
+
+Những nỗ lực nhỏ mỗi ngày cuối cùng cũng tạo ra kết quả lớn. Đội ngũ GoalFlow xin gửi lời chúc mừng chân thành nhất đến bạn. Hãy tiếp tục giữ vững phong độ này nhé!
+
+Đừng quên đặt thêm những mục tiêu mới và tiếp tục hành trình phát triển bản thân cùng GoalFlow.
+
+Chúc bạn luôn thành công!
+
+Trân trọng,
+Đội ngũ GoalFlow`
+        };
+
+        await transporter.sendMail(mailOptions);
+        console.log(`✅ Completion notification email sent to ${email} for goal "${goalTitle}"`);
+        res.json({ success: true });
+    } catch (error) {
+        console.error(`❌ Error sending completion email:`, error.message);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
 // Cho phép Express đọc các file tĩnh (như styles.css)
 app.use(express.static(__dirname));
 
