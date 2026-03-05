@@ -117,7 +117,8 @@ body {
 
 .welcome-content {
     text-align: center;
-    color: white;
+    color: var(--accent-color);
+    /* Đổi màu chữ đồng điệu với nút bấm */
     max-width: 500px;
     animation: slideUp 0.8s ease-out;
 }
@@ -146,7 +147,8 @@ body {
 .logo-icon {
     width: 80px;
     height: 80px;
-    color: white;
+    color: var(--accent-color);
+    /* Đồng bộ màu Logo */
     animation: pulse 2s ease-in-out infinite;
 }
 
