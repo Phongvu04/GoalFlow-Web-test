@@ -228,6 +228,13 @@ app.post('/api/ai/generate-goals', async (req, res) => {
 });
 
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
+// Cho phép Express đọc các file tĩnh (như styles.css)
+app.use(express.static(__dirname));
+
+// Khi có người vào trang chủ ('/'), ném file index.html ra cho họ xem
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'index.html'));
+});
 
 // Start server function
 async function startServer() {
