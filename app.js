@@ -34,7 +34,16 @@ function initializeApp() {
 
 function checkExistingUser() {
     if (AppState.user) {
-        showScreen('choice');
+        // Hiển thị bảng thông báo và ẩn form đăng nhập ở màn hình welcome
+        const notification = document.getElementById('login-notification');
+        if (notification) notification.style.display = 'flex';
+
+        const form = document.getElementById('user-info-form');
+        if (form) form.style.display = 'none';
+
+        // Hiển thị thêm màn hình choice bên dưới cùng màn hình welcome
+        document.getElementById('choice-screen').classList.add('active');
+
         updateUserDisplay();
     }
 }
