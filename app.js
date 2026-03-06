@@ -1,15 +1,42 @@
-// App State
 const AppState = {
     currentScreen: 'welcome',
     user: null,
     goals: [],
     chatHistory: [],
     currentTab: 'all',
-    editingGoalId: null
+    editingGoalId: null,
+    lastActivityTime: null // Thêm biến theo dõi thời gian hoạt động
 };
 
 // API Configuration
 const API_URL = 'http://localhost:3000/api';
+
+let sessionMonitorInterval = null;
+
+function startSessionMonitor() {
+    if (sessionMonitorInterval) clearInterval(sessionMonitorInterval);
+
+    // Kiểm tra định kỳ mỗi 1 phút (60000 ms)
+    sessionMonitorInterval = setInterval(() => {
+        if (!AppState.user) return;
+
+        const lastActivityStr = localStorage.getItem('goalflow_last_activity');
+        if (lastActivityStr) {
+            const lastActivity = parseInt(lastActivityStr, 10);
+            const now = Date.now();
+            const sessionTimeoutMs = 10 * 60 * 1000; // 10 phút
+
+            if (now - lastActivity > sessionTimeoutMs) {
+                // Hết hạn phiên làm việc
+                clearInterval(sessionMonitorInterval);
+                showToast('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.', 'warning');
+                setTimeout(() => {
+                    handleLogoutSilent();
+                }, 2000);
+            }
+        }
+    }, 60000);
+}
 
 // Initialize App
 document.addEventListener('DOMContentLoaded', () => {
@@ -34,18 +61,50 @@ function initializeApp() {
 
 function checkExistingUser() {
     if (AppState.user) {
-        // Hiển thị bảng thông báo và ẩn form đăng nhập ở màn hình welcome
-        const notification = document.getElementById('login-notification');
-        if (notification) notification.style.display = 'flex';
+        // Kiểm tra thời gian hoạt động cuối cùng (Tính bằng mili giây)
+        const lastActivityStr = localStorage.getItem('goalflow_last_activity');
+        if (lastActivityStr) {
+            const lastActivity = parseInt(lastActivityStr, 10);
+            const now = Date.now();
+            const sessionTimeoutMs = 10 * 60 * 1000; // 10 phút
 
-        const form = document.getElementById('user-info-form');
-        if (form) form.style.display = 'none';
+            if (now - lastActivity > sessionTimeoutMs) {
+                // Đã quá 10 phút không tương tác -> Yêu cầu đăng nhập lại
+                showToast('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.', 'warning');
+                // Chờ một chút để hiện toast, sau đó mới reset user
+                setTimeout(() => {
+                    handleLogoutSilent(); // Gọi hàm tự động đăng xuất
+                }, 2000);
+                return; // Dừng việc vào thẳng web
+            }
+        }
 
-        // Hiển thị thêm màn hình choice bên dưới cùng màn hình welcome
-        document.getElementById('choice-screen').classList.add('active');
-
+        // Nếu vẫn còn session hợp lệ
+        updateActivityTime(); // Cập nhật lại thời gian lúc vừa vào web
+        startSessionMonitor(); // Bắt đầu bộ đếm theo dõi
+        showScreen('choice');
         updateUserDisplay();
     }
+}
+
+// Hàm đặt lại thời gian hoạt động
+function updateActivityTime() {
+    if (AppState.user) {
+        AppState.lastActivityTime = Date.now();
+        localStorage.setItem('goalflow_last_activity', AppState.lastActivityTime.toString());
+    }
+}
+
+// Hàm đăng xuất ẩn (khi hết phiên)
+function handleLogoutSilent() {
+    if (sessionMonitorInterval) clearInterval(sessionMonitorInterval);
+    localStorage.removeItem('goalflow_user');
+    // Có thể giữ lại goals hoặc xóa tùy quyết định, ở đây xóa để bảo mật session
+    localStorage.removeItem('goalflow_goals');
+    localStorage.removeItem('goalflow_last_activity');
+    AppState.user = null;
+    AppState.goals = [];
+    showScreen('welcome');
 }
 
 function attachEventListeners() {
@@ -123,6 +182,13 @@ function attachEventListeners() {
     });
 
     document.getElementById('goal-form').addEventListener('submit', handleGoalSubmit);
+
+    // Bắt các sự kiện tương tác để reset thời gian inactivity
+    window.addEventListener('mousemove', updateActivityTime);
+    window.addEventListener('click', updateActivityTime);
+    window.addEventListener('keypress', updateActivityTime);
+    window.addEventListener('scroll', updateActivityTime);
+    window.addEventListener('touchstart', updateActivityTime);
 }
 
 // Screen Management
@@ -250,6 +316,8 @@ async function handleUserSubmit(e) {
         console.error('Error saving user:', error);
     }
 
+    updateActivityTime();
+    startSessionMonitor();
     updateUserDisplay();
     showScreen('choice');
 
@@ -272,6 +340,7 @@ function updateUserDisplay() {
 
 function handleLogout() {
     if (confirm('Bạn có chắc muốn đăng xuất? Dữ liệu sẽ được lưu trên thiết bị này.')) {
+        if (sessionMonitorInterval) clearInterval(sessionMonitorInterval);
         showScreen('welcome');
         showToast('Đã đăng xuất thành công', 'success');
     }
@@ -279,6 +348,7 @@ function handleLogout() {
 
 function deleteAccount() {
     if (confirm('Bạn có chắc muốn xóa tài khoản? Hành động này không thể hoàn tác!')) {
+        if (sessionMonitorInterval) clearInterval(sessionMonitorInterval);
         localStorage.removeItem('goalflow_user');
         localStorage.removeItem('goalflow_goals');
         AppState.user = null;
@@ -778,15 +848,21 @@ function openAISupportModal() {
     } else {
         goalsList.innerHTML = activeGoals.map(goal => `
             <div class="ai-support-goal-item" data-goal-id="${goal.id}">
-                <h4>${goal.title}</h4>
-                ${goal.description ? `<p>${goal.description.substring(0, 50)}${goal.description.length > 50 ? '...' : ''}</p>` : ''}
+                <div class="ai-support-goal-content">
+                    <h4>${goal.title}</h4>
+                    ${goal.description ? `<p>${goal.description.substring(0, 60)}${goal.description.length > 60 ? '...' : ''}</p>` : ''}
+                </div>
+                <button class="btn btn-outline btn-ai-select">Chọn</button>
             </div>
         `).join('');
 
-        goalsList.querySelectorAll('.ai-support-goal-item').forEach(item => {
-            item.addEventListener('click', (e) => {
-                const goalId = e.currentTarget.dataset.goalId;
-                startAISupportForGoal(goalId);
+        goalsList.querySelectorAll('.btn-ai-select').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const item = e.target.closest('.ai-support-goal-item');
+                if (item) {
+                    const goalId = item.dataset.goalId;
+                    startAISupportForGoal(goalId);
+                }
             });
         });
     }
@@ -809,18 +885,30 @@ function startAISupportForGoal(goalId) {
         <div class="chat-message ai-message">
             <div class="message-avatar">AI</div>
             <div class="message-content">
-                <p>Tôi thấy bạn đang cần hỗ trợ cho mục tiêu: <strong>"${goal.title}"</strong>.</p>
-                ${goal.description ? `<p>Mô tả của bạn: "${goal.description}"</p>` : ''}
-                <p>Bạn đang gặp khó khăn gì, hoặc bạn muốn tôi lập kế hoạch chi tiết như thế nào cho mục tiêu này?</p>
+                <p>Tôi đã nhận được thông tin về mục tiêu của bạn: <strong>"${goal.title}"</strong>.</p>
+                <p>Bạn đang gặp khó khăn gì, hoặc muốn tôi phân tích, lập kế hoạch chi tiết như thế nào cho mục tiêu này?</p>
             </div>
         </div>
     `;
 
-    // Initialize chat history with context
+    // Initialize chat history with context about the database goal
+    const goalContext = `[THÔNG TIN HỆ THỐNG: Người dùng cần bạn hỗ trợ về một mục tiêu họ đã lưu.
+- Tên mục tiêu: "${goal.title}"
+- Mô tả chi tiết: "${goal.description || 'Không có'}"
+- Thể loại: ${goal.category}
+- Độ ưu tiên: ${goal.priority}
+- Hạn chót: ${goal.deadline || 'Không có'}
+
+Hãy đóng vai chuyên gia, dựa trên dữ liệu này để tư vấn hoặc lập kế hoạch cho người dùng. Không cần nhắc lại toàn bộ thông tin này với người dùng.]`;
+
     AppState.chatHistory = [
         {
+            role: 'user',
+            content: goalContext
+        },
+        {
             role: 'assistant',
-            content: `Tôi sẽ hỗ trợ bạn với mục tiêu: "${goal.title}". Bạn gặp vấn đề gì?`
+            content: `Tôi đã đọc thông tin về mục tiêu "${goal.title}" của bạn. Bạn đang gặp khó khăn gì, hoặc muốn tôi lập kế hoạch cụ thể như thế nào cho mục tiêu này?`
         }
     ];
 
