@@ -66,7 +66,7 @@ function checkExistingUser() {
         if (lastActivityStr) {
             const lastActivity = parseInt(lastActivityStr, 10);
             const now = Date.now();
-            const sessionTimeoutMs = 10 * 60 * 1000; // 10 phút
+            const sessionTimeoutMs = 1 * 60 * 1000; // 10 phút
 
             if (now - lastActivity > sessionTimeoutMs) {
                 // Đã quá 10 phút không tương tác -> Yêu cầu đăng nhập lại
@@ -201,6 +201,7 @@ function showScreen(screenName) {
     if (targetScreen) {
         targetScreen.classList.add('active');
         AppState.currentScreen = screenName;
+        window.scrollTo(0, 0); // Đảm bảo cuộn lên đầu trang khi chuyển màn hình
 
         // Update screen-specific data
         if (screenName === 'goals') {
@@ -293,41 +294,75 @@ async function handleUserSubmit(e) {
         return;
     }
 
-    AppState.user = {
-        id: Date.now().toString(),
-        name,
-        email,
-        createdAt: new Date().toISOString()
-    };
+    // Send to backend and handle login/register
+    try {
+        // Try to fetch existing user by email
+        const userRes = await fetch(`${API_URL}/users?email=${encodeURIComponent(email)}`);
+        const users = await userRes.json();
+
+        let existingUser = null;
+        if (users && users.length > 0) {
+            existingUser = users.find(u => u.email === email);
+        }
+
+        if (existingUser) {
+            // User exists, login
+            AppState.user = existingUser;
+
+            // Try to fetch their goals
+            try {
+                const goalsRes = await fetch(`${API_URL}/goals/${existingUser.id}`);
+                const goalsData = await goalsRes.json();
+                if (goalsData && goalsData.goals && Array.isArray(goalsData.goals)) {
+                    AppState.goals = goalsData.goals;
+                    localStorage.setItem('goalflow_goals', JSON.stringify(AppState.goals));
+                }
+            } catch (goalErr) {
+                console.error('Error fetching existing goals:', goalErr);
+            }
+
+            showToast(`Chào mừng trở lại, ${AppState.user.name}!`, 'success');
+        } else {
+            // New user, register
+            AppState.user = {
+                id: Date.now().toString(),
+                name,
+                email,
+                createdAt: new Date().toISOString()
+            };
+
+            // Send to backend
+            await fetch(`${API_URL}/users`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(AppState.user)
+            });
+
+            AppState.goals = []; // Reset goals for new user
+            showToast(`Chào mừng ${name}!`, 'success');
+
+            // TODO: Gửi email chào mừng bằng Nodemailer
+        }
+
+    } catch (error) {
+        console.error('Error during login/register:', error);
+        // Fallback for offline mode
+        AppState.user = {
+            id: Date.now().toString(),
+            name,
+            email,
+            createdAt: new Date().toISOString()
+        };
+        showToast(`Chào mừng ${name} (Chế độ offline)!`, 'success');
+    }
 
     // Save to localStorage
     localStorage.setItem('goalflow_user', JSON.stringify(AppState.user));
-
-    // Send to backend
-    try {
-        await fetch(`${API_URL}/users`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(AppState.user)
-        });
-
-        // TODO: Gửi email chào mừng bằng Nodemailer (Sẽ tích hợp ở bước sau trên Server)
-    } catch (error) {
-        console.error('Error saving user:', error);
-    }
 
     updateActivityTime();
     startSessionMonitor();
     updateUserDisplay();
     showScreen('choice');
-
-    // Hiển thị 2 thông báo liên tiếp
-    showToast(`Chào mừng ${name}!`, 'success');
-
-    // Thông báo hành động sau 1 giây
-    setTimeout(() => {
-        showToast('👇 Vui lòng kéo xuống để vào giao diện lựa chọn', 'info');
-    }, 1500);
 }
 
 function updateUserDisplay() {
@@ -688,7 +723,6 @@ function createGoalCard(goal) {
                     </svg>
                     <span>Hoàn thành</span>
                 </button>
-                ` : ''}
                 <button class="btn btn-outline btn-edit" data-goal-id="${goal.id}">
                     <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                         <path d="M11 2l3 3-8 8H3v-3l8-8z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
@@ -701,6 +735,7 @@ function createGoalCard(goal) {
                     </svg>
                     <span>Xóa</span>
                 </button>
+                ` : ''}
             </div>
         </div>
     `;

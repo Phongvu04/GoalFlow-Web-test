@@ -69,6 +69,17 @@ Trân trọng.`
 }
 
 // --- USER ROUTES ---
+app.get('/api/users', async (req, res) => {
+    try {
+        const users = await readJSON(USERS_FILE);
+        if (req.query.email) {
+            const filtered = users.filter(u => u.email === req.query.email);
+            return res.json(filtered);
+        }
+        res.json(users);
+    } catch (e) { res.status(500).json({ success: false, error: e.message }); }
+});
+
 app.post('/api/users', async (req, res) => {
     try {
         const { id, name, email, createdAt } = req.body;

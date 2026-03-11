@@ -106,7 +106,7 @@ body {
 }
 
 /* Welcome Screen */
-#welcome-screen {
+#welcome-screen.active {
     background: transparent;
     display: flex;
     flex-direction: column;
