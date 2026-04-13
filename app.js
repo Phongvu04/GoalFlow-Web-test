@@ -8,8 +8,15 @@ const AppState = {
     lastActivityTime: null // Thêm biến theo dõi thời gian hoạt động
 };
 
-// API Configuration
 const API_URL = 'http://localhost:3000/api';
+
+function getAuthHeaders() {
+    const token = localStorage.getItem('goalflow_token');
+    return {
+        'Content-Type': 'application/json',
+        'Authorization': token ? `Bearer ${token}` : ''
+    };
+}
 
 let sessionMonitorInterval = null;
 
@@ -49,8 +56,9 @@ function initializeApp() {
     // Load data from localStorage
     const savedUser = localStorage.getItem('goalflow_user');
     const savedGoals = localStorage.getItem('goalflow_goals');
+    const token = localStorage.getItem('goalflow_token');
 
-    if (savedUser) {
+    if (savedUser && token) {
         AppState.user = JSON.parse(savedUser);
     }
 
@@ -99,7 +107,7 @@ function updateActivityTime() {
 function handleLogoutSilent() {
     if (sessionMonitorInterval) clearInterval(sessionMonitorInterval);
     localStorage.removeItem('goalflow_user');
-    // Có thể giữ lại goals hoặc xóa tùy quyết định, ở đây xóa để bảo mật session
+    localStorage.removeItem('goalflow_token');
     localStorage.removeItem('goalflow_goals');
     localStorage.removeItem('goalflow_last_activity');
     AppState.user = null;
@@ -110,6 +118,37 @@ function handleLogoutSilent() {
 function attachEventListeners() {
     // Welcome Screen
     document.getElementById('user-info-form').addEventListener('submit', handleUserSubmit);
+    
+    // Auth Tabs Logic
+    document.querySelectorAll('.auth-tab').forEach(tab => {
+        tab.addEventListener('click', (e) => {
+            // Reset tất cả tab
+            document.querySelectorAll('.auth-tab').forEach(t => {
+                t.classList.remove('active');
+                t.style.borderBottom = '2px solid transparent';
+                t.style.color = 'var(--text-secondary)';
+            });
+            const target = e.currentTarget;
+            target.classList.add('active');
+            target.style.borderBottom = '2px solid var(--primary-color)';
+            target.style.color = 'var(--text-color)';
+
+            const mode = target.dataset.target;
+            const form = document.getElementById('user-info-form');
+            form.dataset.mode = mode;
+
+            if (mode === 'register') {
+                document.querySelectorAll('.register-only').forEach(el => el.style.display = 'block');
+                document.getElementById('auth-submit-text').textContent = 'Đăng ký tài khoản';
+                document.getElementById('user-name').required = true;
+            } else {
+                document.querySelectorAll('.register-only').forEach(el => el.style.display = 'none');
+                document.getElementById('auth-submit-text').textContent = 'Đăng nhập hệ thống';
+                document.getElementById('user-name').required = false;
+            }
+        });
+    });
+
     const welcomeLogo = document.getElementById('main-logo-welcome');
     if (welcomeLogo) {
         welcomeLogo.addEventListener('click', () => {
@@ -203,7 +242,6 @@ function showScreen(screenName) {
         AppState.currentScreen = screenName;
         window.scrollTo(0, 0); // Đảm bảo cuộn lên đầu trang khi chuyển màn hình
 
-        // Update screen-specific data
         if (screenName === 'goals') {
             renderGoals();
             startNotificationSystem(); // Khởi động kiểm tra thông báo
@@ -276,93 +314,78 @@ function sendBrowserNotification(title, body) {
 }
 
 // User Management
+// User Management
 async function handleUserSubmit(e) {
     e.preventDefault();
 
+    const form = document.getElementById('user-info-form');
+    const mode = form.dataset.mode || 'login';
     const name = document.getElementById('user-name').value.trim();
     const email = document.getElementById('user-email').value.trim();
+    const password = document.getElementById('user-password').value;
 
-    if (!name || !email) {
+    if (!email || !password) {
         showToast('Vui lòng điền đầy đủ thông tin', 'error');
+        return;
+    }
+    
+    if (mode === 'register' && !name) {
+        showToast('Vui lòng nhập tên cho tài khoản mới', 'error');
         return;
     }
 
     if (!email.toLowerCase().endsWith('@gmail.com')) {
         showToast('Vui lòng nhập đúng định dạng @gmail.com', 'error');
-        // Quét focus vào ô lỗi
         document.getElementById('user-email').focus();
         return;
     }
 
-    // Send to backend and handle login/register
+    const endpoint = mode === 'register' ? '/auth/register' : '/auth/login';
+    const payload = mode === 'register' ? { name, email, password } : { email, password };
+
     try {
-        // Try to fetch existing user by email
-        const userRes = await fetch(`${API_URL}/users?email=${encodeURIComponent(email)}`);
-        const users = await userRes.json();
+        const response = await fetch(`${API_URL}${endpoint}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
 
-        let existingUser = null;
-        if (users && users.length > 0) {
-            existingUser = users.find(u => u.email === email);
-        }
+        const data = await response.json();
 
-        if (existingUser) {
-            // User exists, login
-            AppState.user = existingUser;
+        if (response.ok && data.success) {
+            // Save Token & User Info
+            localStorage.setItem('goalflow_token', data.token);
+            localStorage.setItem('goalflow_user', JSON.stringify(data.user));
+            AppState.user = data.user;
 
-            // Try to fetch their goals
+            // Fetch Data
             try {
-                const goalsRes = await fetch(`${API_URL}/goals/${existingUser.id}`);
+                const goalsRes = await fetch(`${API_URL}/goals`, { headers: getAuthHeaders() });
                 const goalsData = await goalsRes.json();
                 if (goalsData && goalsData.goals && Array.isArray(goalsData.goals)) {
                     AppState.goals = goalsData.goals;
                     localStorage.setItem('goalflow_goals', JSON.stringify(AppState.goals));
+                } else {
+                    AppState.goals = [];
                 }
             } catch (goalErr) {
                 console.error('Error fetching existing goals:', goalErr);
+                AppState.goals = [];
             }
 
-            showToast(`Chào mừng trở lại, ${AppState.user.name}!`, 'success');
+            showToast(`Chào mừng ${data.user.name}!`, 'success');
+            
+            updateActivityTime();
+            startSessionMonitor();
+            updateUserDisplay();
+            showScreen('choice');
         } else {
-            // New user, register
-            AppState.user = {
-                id: Date.now().toString(),
-                name,
-                email,
-                createdAt: new Date().toISOString()
-            };
-
-            // Send to backend
-            await fetch(`${API_URL}/users`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(AppState.user)
-            });
-
-            AppState.goals = []; // Reset goals for new user
-            showToast(`Chào mừng ${name}!`, 'success');
-
-            // TODO: Gửi email chào mừng bằng Nodemailer
+            showToast(data.error || 'Có lỗi xảy ra', 'error');
         }
-
     } catch (error) {
-        console.error('Error during login/register:', error);
-        // Fallback for offline mode
-        AppState.user = {
-            id: Date.now().toString(),
-            name,
-            email,
-            createdAt: new Date().toISOString()
-        };
-        showToast(`Chào mừng ${name} (Chế độ offline)!`, 'success');
+        console.error('Lỗi đăng nhập/đăng ký:', error);
+        showToast('Không thể kết nối máy chủ', 'error');
     }
-
-    // Save to localStorage
-    localStorage.setItem('goalflow_user', JSON.stringify(AppState.user));
-
-    updateActivityTime();
-    startSessionMonitor();
-    updateUserDisplay();
-    showScreen('choice');
 }
 
 function updateUserDisplay() {
@@ -440,7 +463,7 @@ async function handleChatSubmit(e) {
     try {
         const response = await fetch(`${API_URL}/ai/chat`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: getAuthHeaders(),
             body: JSON.stringify({
                 userId: AppState.user.id,
                 message: message,
@@ -532,7 +555,7 @@ async function generateGoalsFromChat() {
     try {
         const response = await fetch(`${API_URL}/ai/generate-goals`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: getAuthHeaders(),
             body: JSON.stringify({
                 userId: AppState.user.id,
                 chatHistory: AppState.chatHistory,
@@ -991,7 +1014,7 @@ function saveGoals() {
     try {
         fetch(`${API_URL}/goals`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: getAuthHeaders(),
             body: JSON.stringify({
                 userId: AppState.user.id,
                 goals: AppState.goals
@@ -1006,7 +1029,7 @@ async function sendCompletionNotification(goal) {
     try {
         await fetch(`${API_URL}/notifications/completion`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: getAuthHeaders(),
             body: JSON.stringify({
                 userId: AppState.user.id,
                 email: AppState.user.email,

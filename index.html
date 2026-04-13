@@ -35,10 +35,15 @@
                 <p class="tagline">Biến giấc mơ thành hành động</p>
 
 
-                <form id="user-info-form" class="user-form">
-                    <div class="form-group">
+                <div class="auth-tabs" style="display: flex; justify-content: center; margin-bottom: 20px; gap: 20px;">
+                    <button type="button" class="auth-tab active" data-target="login" style="background:none; border:none; border-bottom: 2px solid var(--primary-color); font-size: 1.1rem; cursor:pointer; padding-bottom:5px; font-weight:bold; color:var(--text-color);">Đăng Nhập</button>
+                    <button type="button" class="auth-tab" data-target="register" style="background:none; border:none; border-bottom: 2px solid transparent; font-size: 1.1rem; cursor:pointer; padding-bottom:5px; font-weight:bold; color:var(--text-secondary);">Đăng Ký</button>
+                </div>
+
+                <form id="user-info-form" class="user-form" data-mode="login">
+                    <div class="form-group register-only" style="display: none;">
                         <label for="user-name">Tên của bạn</label>
-                        <input type="text" id="user-name" name="name" required placeholder="Nguyễn Văn A">
+                        <input type="text" id="user-name" name="name" placeholder="Nguyễn Văn A">
                     </div>
 
                     <div class="form-group">
@@ -47,8 +52,13 @@
                             title="Vui lòng nhập đúng địa chỉ @gmail.com" required placeholder="example@gmail.com">
                     </div>
 
-                    <button type="submit" class="btn btn-primary">
-                        <span>Bắt đầu hành trình</span>
+                    <div class="form-group">
+                        <label for="user-password">Mật khẩu</label>
+                        <input type="password" id="user-password" name="password" minlength="6" required placeholder="Mật khẩu từ 6 ký tự">
+                    </div>
+
+                    <button type="submit" class="btn btn-primary" id="auth-submit-btn">
+                        <span id="auth-submit-text">Đăng nhập</span>
                         <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
                             <path d="M4 10h12M12 6l4 4-4 4" stroke="currentColor" stroke-width="2"
                                 stroke-linecap="round" />
@@ -375,6 +385,7 @@
                 </div>
             </div>
         </div>
+
     </div>
 
     <!-- Modal for Adding/Editing Goals -->

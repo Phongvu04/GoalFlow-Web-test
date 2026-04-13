@@ -3,7 +3,14 @@ const cors = require('cors');
 const fs = require('fs').promises;
 const path = require('path');
 const nodemailer = require('nodemailer');
+const mongoose = require('mongoose');
+const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
 require('dotenv').config();
+
+const User = require('./models/User');
+const Goal = require('./models/Goal');
+const authMiddleware = require('./middleware/auth');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -18,21 +25,23 @@ const DATA_DIR = path.join(__dirname, 'data');
 const USERS_FILE = path.join(DATA_DIR, 'users.json');
 const GOALS_FILE = path.join(DATA_DIR, 'goals.json');
 
-// Khởi tạo dữ liệu
-async function initializeDataStorage() {
+// Khởi tạo và kết nối cơ sở dữ liệu MongoDB
+async function connectDB() {
     try {
-        await fs.mkdir(DATA_DIR, { recursive: true });
-        try { await fs.access(USERS_FILE); } catch { await fs.writeFile(USERS_FILE, JSON.stringify([])); }
-        try { await fs.access(GOALS_FILE); } catch { await fs.writeFile(GOALS_FILE, JSON.stringify([])); }
-        console.log('✅ Database initialized');
-    } catch (error) { console.error('Init Error:', error); }
-}
+        await mongoose.connect(process.env.MONGODB_URI);
+        console.log('✅ Connected to MongoDB');
 
-async function readJSON(filePath) {
-    try { return JSON.parse(await fs.readFile(filePath, 'utf8')); } catch { return []; }
-}
-async function writeJSON(filePath, data) {
-    try { await fs.writeFile(filePath, JSON.stringify(data, null, 2)); return true; } catch { return false; }
+        // Xóa những User cũ không có password để tránh lỗi hệ thống jwt
+        try {
+            const deleted = await User.deleteMany({ password: { $exists: false } });
+            if (deleted.deletedCount > 0) {
+                console.log(`🗑️ Đã xóa ${deleted.deletedCount} tài khoản hệ thống cũ (không có mật khẩu)`);
+            }
+        } catch (e) { console.error('Lỗi khi clean up DB:', e); }
+
+    } catch (error) {
+        console.error('❌ Lỗi kết nối MongoDB:', error);
+    }
 }
 
 // Nodemailer Configuration
@@ -68,56 +77,91 @@ Trân trọng.`
     }
 }
 
-// --- USER ROUTES ---
-app.get('/api/users', async (req, res) => {
+// --- AUTH ROUTES ---
+app.post('/api/auth/register', async (req, res) => {
     try {
-        const users = await readJSON(USERS_FILE);
-        if (req.query.email) {
-            const filtered = users.filter(u => u.email === req.query.email);
-            return res.json(filtered);
-        }
-        res.json(users);
-    } catch (e) { res.status(500).json({ success: false, error: e.message }); }
-});
+        const { name, email, password } = req.body;
 
-app.post('/api/users', async (req, res) => {
-    try {
-        const { id, name, email, createdAt } = req.body;
-
-        // Backend Validation: Chỉ chấp nhận gmail
         if (!email || !email.toLowerCase().endsWith('@gmail.com')) {
             return res.status(400).json({ success: false, error: 'Chỉ chấp nhận địa chỉ @gmail.com' });
         }
-
-        const users = await readJSON(USERS_FILE);
-        if (!users.find(u => u.email === email)) {
-            users.push({ id, name, email, createdAt });
-            await writeJSON(USERS_FILE, users);
-
-            // Gửi email chào mừng lần đầu đăng ký
-            await sendWelcomeEmail(email, name);
+        
+        if (!password || password.length < 6) {
+            return res.status(400).json({ success: false, error: 'Mật khẩu phải từ 6 ký tự trở lên' });
         }
 
-        res.json({ success: true });
+        let user = await User.findOne({ email });
+        if (user) {
+            return res.status(400).json({ success: false, error: 'Email đã được đăng ký' });
+        }
+
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(password, salt);
+
+        user = await User.create({ 
+            id: Date.now().toString(), 
+            name, 
+            email, 
+            password: hashedPassword,
+            createdAt: new Date().toISOString()
+        });
+
+        // Gửi email chào mừng chạy ngầm
+        sendWelcomeEmail(email, name).catch(console.error);
+
+        const token = jwt.sign({ id: user.id, email: user.email }, process.env.JWT_SECRET, { expiresIn: '7d' });
+
+        res.json({ success: true, token, user: { id: user.id, name: user.name, email: user.email } });
+    } catch (e) { res.status(500).json({ success: false, error: e.message }); }
+});
+
+app.post('/api/auth/login', async (req, res) => {
+    try {
+        const { email, password } = req.body;
+
+        const user = await User.findOne({ email });
+        if (!user) {
+            return res.status(400).json({ success: false, error: 'Tài khoản không tồn tại' });
+        }
+
+        const isMatch = await bcrypt.compare(password, user.password);
+        if (!isMatch) {
+            return res.status(400).json({ success: false, error: 'Mật khẩu không chính xác' });
+        }
+
+        const token = jwt.sign({ id: user.id, email: user.email }, process.env.JWT_SECRET, { expiresIn: '7d' });
+
+        res.json({ success: true, token, user: { id: user.id, name: user.name, email: user.email } });
+    } catch (e) { res.status(500).json({ success: false, error: e.message }); }
+});
+
+app.get('/api/users/me', authMiddleware, async (req, res) => {
+    try {
+        const user = await User.findOne({ id: req.user.id }).select('-password');
+        if (!user) return res.status(404).json({ success: false, error: 'Không tìm thấy user' });
+        res.json({ success: true, user });
     } catch (e) { res.status(500).json({ success: false, error: e.message }); }
 });
 
 // --- GOAL ROUTES ---
-app.post('/api/goals', async (req, res) => {
+app.post('/api/goals', authMiddleware, async (req, res) => {
     try {
-        const { userId, goals } = req.body;
-        const allGoals = await readJSON(GOALS_FILE);
-        const otherGoals = allGoals.filter(g => g.userId !== userId);
-        await writeJSON(GOALS_FILE, [...otherGoals, ...goals.map(g => ({ ...g, userId }))]);
+        const { goals } = req.body;
+        const userId = req.user.id;
+        
+        await Goal.deleteMany({ userId });
+        if (goals && goals.length > 0) {
+            await Goal.insertMany(goals.map(g => ({ ...g, userId })));
+        }
         res.json({ success: true });
-    } catch (e) { res.status(500).json({ success: false }); }
+    } catch (e) { res.status(500).json({ success: false, error: e.message }); }
 });
 
-app.get('/api/goals/:userId', async (req, res) => {
+app.get('/api/goals', authMiddleware, async (req, res) => {
     try {
-        const allGoals = await readJSON(GOALS_FILE);
-        res.json({ success: true, goals: allGoals.filter(g => g.userId === req.params.userId) });
-    } catch (e) { res.status(500).json({ success: false }); }
+        const goals = await Goal.find({ userId: req.user.id });
+        res.json({ success: true, goals });
+    } catch (e) { res.status(500).json({ success: false, error: e.message }); }
 });
 
 // --- AI INTEGRATION (GROQ - LLAMA 3.3) ---
@@ -147,7 +191,7 @@ async function callGroqAPI(messages, jsonMode = false) {
 }
 
 // 1. Chat API
-app.post('/api/ai/chat', async (req, res) => {
+app.post('/api/ai/chat', authMiddleware, async (req, res) => {
     try {
         const { message, history } = req.body;
         // Chỉ lấy 10 tin nhắn gần nhất
@@ -177,7 +221,7 @@ app.post('/api/ai/chat', async (req, res) => {
 });
 
 // 2. Generate Goals API
-app.post('/api/ai/generate-goals', async (req, res) => {
+app.post('/api/ai/generate-goals', authMiddleware, async (req, res) => {
     try {
         const { chatHistory, timeframe } = req.body;
         const conversation = chatHistory.map(m => `${m.role}: ${m.content}`).join('\n');
@@ -267,11 +311,14 @@ Trân trọng,
 Đội ngũ GoalFlow`
         };
 
-        await transporter.sendMail(mailOptions);
-        console.log(`✅ Completion notification email sent to ${email} for goal "${goalTitle}"`);
+        // Gửi email chạy ngầm không cần await để tránh làm chậm UI người dùng
+        transporter.sendMail(mailOptions)
+            .then(() => console.log(`✅ Completion notification email sent to ${email} for goal "${goalTitle}"`))
+            .catch((err) => console.error(`❌ Error sending completion email:`, err.message));
+            
         res.json({ success: true });
     } catch (error) {
-        console.error(`❌ Error sending completion email:`, error.message);
+        console.error(`❌ Lỗi gửi thông báo completion:`, error.message);
         res.status(500).json({ success: false, error: error.message });
     }
 });
@@ -286,7 +333,7 @@ app.get('/', (req, res) => {
 
 // Start server function
 async function startServer() {
-    await initializeDataStorage();
+    await connectDB();
     app.listen(PORT, () => {
         console.log(`
 ╔══════════════════════════════════════╗
