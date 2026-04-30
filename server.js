@@ -109,9 +109,7 @@ app.post('/api/auth/register', async (req, res) => {
         // Gửi email chào mừng chạy ngầm
         sendWelcomeEmail(email, name).catch(console.error);
 
-        const token = jwt.sign({ id: user.id, email: user.email }, process.env.JWT_SECRET, { expiresIn: '7d' });
-
-        res.json({ success: true, token, user: { id: user.id, name: user.name, email: user.email } });
+        res.json({ success: true, message: 'Đăng ký thành công. Vui lòng đăng nhập.' });
     } catch (e) { res.status(500).json({ success: false, error: e.message }); }
 });
 
@@ -141,6 +139,68 @@ app.get('/api/users/me', authMiddleware, async (req, res) => {
         if (!user) return res.status(404).json({ success: false, error: 'Không tìm thấy user' });
         res.json({ success: true, user });
     } catch (e) { res.status(500).json({ success: false, error: e.message }); }
+});
+
+app.post('/api/auth/forgot-password', async (req, res) => {
+    try {
+        const { email } = req.body;
+        if (!email) return res.status(400).json({ success: false, error: 'Vui lòng cung cấp email' });
+        
+        const user = await User.findOne({ email });
+        if (!user) return res.status(400).json({ success: false, error: 'Email không tồn tại trong hệ thống' });
+        
+        const newPassword = Math.random().toString(36).slice(-8); // Generate 8-character random password
+        
+        const salt = await bcrypt.genSalt(10);
+        user.password = await bcrypt.hash(newPassword, salt);
+        await user.save();
+        
+        const mailOptions = {
+            from: `"GoalFlow Team" <${process.env.EMAIL_USER}>`,
+            to: email,
+            subject: 'Khôi phục mật khẩu GoalFlow',
+            text: `Chào ${user.name},\n\nMật khẩu của bạn đã được đặt lại thành công.\n\nMật khẩu mới của bạn là: ${newPassword}\n\nVui lòng sử dụng mật khẩu này để đăng nhập hệ thống.\n\nTrân trọng,\nĐội ngũ GoalFlow`
+        };
+        
+        // Send email in background
+        transporter.sendMail(mailOptions).catch(console.error);
+        
+        res.json({ success: true, message: 'Mật khẩu mới đã được gửi vào email của bạn. Vui lòng kiểm tra hộp thư.' });
+    } catch (e) {
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
+app.post('/api/auth/change-password', authMiddleware, async (req, res) => {
+    try {
+        const { oldPassword, newPassword } = req.body;
+        
+        if (!oldPassword || !newPassword) {
+            return res.status(400).json({ success: false, error: 'Vui lòng cung cấp đầy đủ mật khẩu' });
+        }
+
+        if (newPassword.length < 6) {
+            return res.status(400).json({ success: false, error: 'Mật khẩu mới phải từ 6 ký tự trở lên' });
+        }
+
+        const user = await User.findOne({ id: req.user.id });
+        if (!user) {
+            return res.status(404).json({ success: false, error: 'Không tìm thấy người dùng' });
+        }
+
+        const isMatch = await bcrypt.compare(oldPassword, user.password);
+        if (!isMatch) {
+            return res.status(400).json({ success: false, error: 'Mật khẩu hiện tại không chính xác' });
+        }
+
+        const salt = await bcrypt.genSalt(10);
+        user.password = await bcrypt.hash(newPassword, salt);
+        await user.save();
+
+        res.json({ success: true, message: 'Đổi mật khẩu thành công' });
+    } catch (e) {
+        res.status(500).json({ success: false, error: e.message });
+    }
 });
 
 // --- GOAL ROUTES ---

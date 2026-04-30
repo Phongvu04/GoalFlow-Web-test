@@ -53,7 +53,10 @@
                     </div>
 
                     <div class="form-group">
-                        <label for="user-password">Mật khẩu</label>
+                        <label for="user-password" style="display: flex; justify-content: space-between;">
+                            <span>Mật khẩu</span>
+                            <a href="#" id="forgot-password-link" class="login-only" style="font-size: 0.85rem; color: var(--primary-color); text-decoration: none; font-weight: normal;">Quên mật khẩu?</a>
+                        </label>
                         <input type="password" id="user-password" name="password" minlength="6" required placeholder="Mật khẩu từ 6 ký tự">
                     </div>
 
@@ -375,6 +378,12 @@
                         </svg>
                         <span>Xuất dữ liệu</span>
                     </button>
+                    <button id="change-password-btn" class="btn btn-outline" style="border-color: var(--warning-color); color: var(--warning-color);">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                            <path d="M15 7C16.1046 7 17 6.10457 17 5C17 3.89543 16.1046 3 15 3C13.8954 3 13 3.89543 13 5C13 5.41249 13.1246 5.79594 13.3364 6.11545L4 15.4519V19H7.54813L9 17.5481V15H11.5481L13 13.5481V11H14.1155C14.3912 11.0827 14.6888 11.1278 15 11C16.1046 11 17 10.1046 17 9C17 7.89543 16.1046 7 15 7Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                        <span>Đổi mật khẩu</span>
+                    </button>
                     <button id="delete-account-btn" class="btn btn-danger">
                         <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
                             <path d="M3 6h14M8 6V4a2 2 0 012-2h0a2 2 0 012 2v2M5 6v10a2 2 0 002 2h6a2 2 0 002-2V6"
@@ -463,6 +472,69 @@
                 style="margin-top: 16px; max-height: 400px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px;">
                 <!-- Goals list will be injected here via app.js -->
             </div>
+        </div>
+    </div>
+
+    <!-- Modal cho tính năng Quên mật khẩu -->
+    <div id="forgot-password-modal" class="modal">
+        <div class="modal-content" style="max-width: 400px;">
+            <div class="modal-header">
+                <h3>Khôi phục mật khẩu</h3>
+                <button class="close-forgot-modal cancel-forgot-modal"
+                    style="background: none; border: none; cursor: pointer; color: var(--text-secondary);">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                        <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                    </svg>
+                </button>
+            </div>
+            <form id="forgot-password-form" style="margin-top: 20px;">
+                <p style="margin-bottom: 15px; font-size: 0.95rem; color: var(--text-secondary);">Vui lòng nhập địa chỉ email đã đăng ký. Chúng tôi sẽ thiết lập lại mật khẩu và gửi cho bạn.</p>
+                <div class="form-group">
+                    <label for="forgot-email">Email của bạn</label>
+                    <input type="email" id="forgot-email" required placeholder="example@gmail.com" pattern=".+@gmail\.com">
+                </div>
+                <div class="modal-actions" style="margin-top: 20px;">
+                    <button type="button" class="btn btn-outline cancel-forgot-modal">Hủy</button>
+                    <button type="submit" class="btn btn-primary" id="btn-submit-forgot">
+                        <span>Gửi mật khẩu mới</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal cho tính năng Đổi mật khẩu -->
+    <div id="change-password-modal" class="modal">
+        <div class="modal-content" style="max-width: 400px;">
+            <div class="modal-header">
+                <h3>Đổi mật khẩu</h3>
+                <button class="close-change-password-modal cancel-change-password-modal"
+                    style="background: none; border: none; cursor: pointer; color: var(--text-secondary);">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                        <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                    </svg>
+                </button>
+            </div>
+            <form id="change-password-form" style="margin-top: 20px;">
+                <div class="form-group">
+                    <label for="old-password">Mật khẩu cũ</label>
+                    <input type="password" id="old-password" required minlength="6" placeholder="Nhập mật khẩu hiện tại">
+                </div>
+                <div class="form-group">
+                    <label for="new-password">Mật khẩu mới</label>
+                    <input type="password" id="new-password" required minlength="6" placeholder="Mật khẩu từ 6 ký tự">
+                </div>
+                <div class="form-group">
+                    <label for="confirm-password">Nhập lại mật khẩu mới</label>
+                    <input type="password" id="confirm-password" required minlength="6" placeholder="Xác nhận mật khẩu mới">
+                </div>
+                <div class="modal-actions" style="margin-top: 20px;">
+                    <button type="button" class="btn btn-outline cancel-change-password-modal">Hủy</button>
+                    <button type="submit" class="btn btn-primary" id="btn-submit-change-password">
+                        <span>Lưu thay đổi</span>
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 

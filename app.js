@@ -139,10 +139,12 @@ function attachEventListeners() {
 
             if (mode === 'register') {
                 document.querySelectorAll('.register-only').forEach(el => el.style.display = 'block');
+                document.querySelectorAll('.login-only').forEach(el => el.style.display = 'none');
                 document.getElementById('auth-submit-text').textContent = 'Đăng ký tài khoản';
                 document.getElementById('user-name').required = true;
             } else {
                 document.querySelectorAll('.register-only').forEach(el => el.style.display = 'none');
+                document.querySelectorAll('.login-only').forEach(el => el.style.display = 'block');
                 document.getElementById('auth-submit-text').textContent = 'Đăng nhập hệ thống';
                 document.getElementById('user-name').required = false;
             }
@@ -199,6 +201,25 @@ function attachEventListeners() {
     document.getElementById('export-data-btn').addEventListener('click', exportUserData);
     document.getElementById('delete-account-btn').addEventListener('click', deleteAccount);
 
+    const changePasswordBtn = document.getElementById('change-password-btn');
+    if (changePasswordBtn) {
+        changePasswordBtn.addEventListener('click', () => {
+            document.getElementById('change-password-modal').classList.add('active');
+            document.getElementById('change-password-form').reset();
+        });
+    }
+
+    document.querySelectorAll('.close-change-password-modal, .cancel-change-password-modal').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.getElementById('change-password-modal').classList.remove('active');
+        });
+    });
+
+    const changePasswordForm = document.getElementById('change-password-form');
+    if (changePasswordForm) {
+        changePasswordForm.addEventListener('submit', handleChangePasswordSubmit);
+    }
+
     // Modal
     document.querySelectorAll('.close-modal, .cancel-modal').forEach(btn => {
         btn.addEventListener('click', closeGoalModal);
@@ -221,6 +242,25 @@ function attachEventListeners() {
     });
 
     document.getElementById('goal-form').addEventListener('submit', handleGoalSubmit);
+
+    const forgotPasswordLink = document.getElementById('forgot-password-link');
+    if (forgotPasswordLink) {
+        forgotPasswordLink.addEventListener('click', (e) => {
+            e.preventDefault();
+            document.getElementById('forgot-password-modal').classList.add('active');
+        });
+    }
+
+    document.querySelectorAll('.close-forgot-modal, .cancel-forgot-modal').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.getElementById('forgot-password-modal').classList.remove('active');
+        });
+    });
+
+    const forgotPasswordForm = document.getElementById('forgot-password-form');
+    if (forgotPasswordForm) {
+        forgotPasswordForm.addEventListener('submit', handleForgotPasswordSubmit);
+    }
 
     // Bắt các sự kiện tương tác để reset thời gian inactivity
     window.addEventListener('mousemove', updateActivityTime);
@@ -353,6 +393,12 @@ async function handleUserSubmit(e) {
         const data = await response.json();
 
         if (response.ok && data.success) {
+            if (mode === 'register') {
+                showToast(data.message || 'Đăng ký thành công! Vui lòng đăng nhập.', 'success');
+                document.querySelector('.auth-tab[data-target="login"]').click();
+                return;
+            }
+
             // Save Token & User Info
             localStorage.setItem('goalflow_token', data.token);
             localStorage.setItem('goalflow_user', JSON.stringify(data.user));
@@ -385,6 +431,99 @@ async function handleUserSubmit(e) {
     } catch (error) {
         console.error('Lỗi đăng nhập/đăng ký:', error);
         showToast('Không thể kết nối máy chủ', 'error');
+    }
+}
+
+async function handleForgotPasswordSubmit(e) {
+    e.preventDefault();
+    const emailInput = document.getElementById('forgot-email');
+    const email = emailInput.value.trim();
+    const submitBtn = document.getElementById('btn-submit-forgot');
+    const originalBtnRaw = submitBtn.innerHTML;
+
+    if (!email) {
+        showToast('Vui lòng nhập địa chỉ email', 'error');
+        return;
+    }
+
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<div class="loading"></div><span>Đang xử lý...</span>';
+
+    try {
+        const response = await fetch(`${API_URL}/auth/forgot-password`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email })
+        });
+        const data = await response.json();
+
+        if (response.ok && data.success) {
+            showToast(data.message, 'success');
+            document.getElementById('forgot-password-modal').classList.remove('active');
+            emailInput.value = '';
+        } else {
+            showToast(data.error || 'Có lỗi xảy ra', 'error');
+        }
+    } catch (error) {
+        console.error('Lỗi khi khôi phục mật khẩu:', error);
+        showToast('Không thể kết nối máy chủ', 'error');
+    } finally {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalBtnRaw;
+    }
+}
+
+async function handleChangePasswordSubmit(e) {
+    e.preventDefault();
+    const oldPassword = document.getElementById('old-password').value;
+    const newPassword = document.getElementById('new-password').value;
+    const confirmPassword = document.getElementById('confirm-password').value;
+    const submitBtn = document.getElementById('btn-submit-change-password');
+    const originalBtnRaw = submitBtn.innerHTML;
+
+    if (newPassword !== confirmPassword) {
+        showToast('Mật khẩu mới và xác nhận không khớp', 'error');
+        return;
+    }
+
+    if (newPassword.length < 6) {
+        showToast('Mật khẩu mới phải từ 6 ký tự trở lên', 'error');
+        return;
+    }
+
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<div class="loading"></div><span>Đang xử lý...</span>';
+
+    try {
+        const response = await fetch(`${API_URL}/auth/change-password`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify({ oldPassword, newPassword })
+        });
+        const data = await response.json();
+
+        if (response.ok && data.success) {
+            document.getElementById('change-password-modal').classList.remove('active');
+            
+            setTimeout(() => {
+                const wantToLogout = confirm('Đổi mật khẩu thành công! Bạn có muốn thoát ra và đăng nhập lại bằng mật khẩu mới không?');
+                if (wantToLogout) {
+                    handleLogoutSilent();
+                    showToast('Vui lòng đăng nhập lại bằng mật khẩu mới', 'info');
+                } else {
+                    showToast('Đổi mật khẩu thành công', 'success');
+                }
+            }, 100);
+
+        } else {
+            showToast(data.error || 'Có lỗi xảy ra', 'error');
+        }
+    } catch (error) {
+        console.error('Lỗi khi đổi mật khẩu:', error);
+        showToast('Không thể kết nối máy chủ', 'error');
+    } finally {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalBtnRaw;
     }
 }
 
